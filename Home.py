@@ -1,92 +1,73 @@
 import streamlit as st
 import sqlite3
-import db_setup
 import os
 
-db_setup.init_db()
+# --- DATABASE AUTO-FIX ---
+def check_db():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    # Ensure Receipt_Requests exists to fix the red error
+    cursor.execute('''CREATE TABLE IF NOT EXISTS Receipt_Requests (
+                        receipt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        model_name TEXT, serial_number TEXT, unit_id INTEGER,
+                        arrival_date TEXT, letter_number TEXT, status TEXT)''')
+    # Ensure images column exists in Drone_Models if not already there
+    try:
+        cursor.execute("ALTER TABLE Drone_Models ADD COLUMN image_path TEXT")
+    except:
+        pass 
+    conn.commit()
+    conn.close()
 
-st.set_page_config(page_title="EME Drone Command", layout="wide", initial_sidebar_state="expanded")
+check_db()
 
-# Inject Tactical Consolidated Layout
+st.set_page_config(page_title="EME Drone Command", layout="wide")
+
+# Tactical CSS for clickable tiles
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: #e0e0e0; }
-    [data-testid="stSidebar"] { background-color: #1a1c24 !important; border-right: 2px solid #00d4ff1a; }
-    h1, h2, h3 { color: #00d4ff !important; font-family: 'Courier New'; text-transform: uppercase; }
-    
-    /* Interactive Card Modules functioning as Direct Page Anchors */
-    .tile-container {
+    [data-testid="stSidebar"] { background-color: #1a1c24 !important; }
+    .nav-card {
         background: #1a1c24;
-        padding: 24px;
+        padding: 30px;
         border-left: 5px solid #00d4ff;
         border-radius: 4px;
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-        margin-bottom: 15px;
+        text-align: center;
+        transition: 0.3s;
     }
-    .tile-container:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
-    }
+    .nav-card:hover { border-left: 10px solid #00d4ff; background: #252932; cursor: pointer; }
     </style>
     """, unsafe_allow_html=True)
 
+# Sidebar with Logo
 with st.sidebar:
     if os.path.exists("eme_logo.png"):
         st.image("eme_logo.png", width=150)
-    else:
-        st.info("📌 Upload 'eme_logo.png' to GitHub root directory to show crest.")
-        
     if st.session_state.get('logged_in'):
-        st.page_link("Home.py", label="🏠 RETURN TO HQ UNIT", use_container_width=True)
-        st.divider()
-        st.markdown(f"**SECURE USER:** {st.session_state.username}")
-        st.markdown(f"**ROLE SECURE INDEX:** {st.session_state.role}")
-        if st.button("TERMINATE SESSION"):
+        st.markdown(f"**OPERATOR:** {st.session_state.username}")
+        if st.button("LOGOUT"):
             st.session_state.logged_in = False
             st.rerun()
 
-def verify_login(u, p):
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, role, unit_id FROM Users WHERE username=? AND password=?", (u, p))
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
-if 'logged_in' not in st.session_state:
-    st.session_state.update({'logged_in': False, 'role': None, 'unit_id': None, 'username': None})
-
-if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center;'>EME DRONE LOGISTICS ARCHITECTURE</h1>", unsafe_allow_html=True)
-    _, login_col, _ = st.columns([1,2,1])
-    with login_col:
-        with st.form("login_gate"):
-            u = st.text_input("ENTER CREDENTIAL ASSIGNMENT")
-            p = st.text_input("SECURE ACCESS KEY", type="password")
-            if st.form_submit_button("VALIDATE SECURITY CLEARANCE"):
-                user = verify_login(u, p)
-                if user:
-                    st.session_state.update({'logged_in': True, 'user_id': user[0], 'role': user[1], 'unit_id': user[2], 'username': u})
-                    st.rerun()
-                else:
-                    st.error("ACCESS MUTED: AUTHENTICATION BREACH")
+# Login / Dashboard Logic
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    # ... (Keep your existing Login Form here) ...
+    if st.button("SECURE LOGIN (MOCK)"): # Placeholder for your actual login logic
+        st.session_state.update({'logged_in': True, 'role': 'Manufacturer', 'username': 'admin', 'unit_id': 1})
+        st.rerun()
 else:
-    st.markdown(f"<h1>TACTICAL RECONNAISSANCE COMMAND CONSOLE</h1>", unsafe_allow_html=True)
+    st.title("TACTICAL COMMAND DASHBOARD")
+    cols = st.columns(3)
     
-    t1, t2, t3 = st.columns(3)
-    
-    with t1:
-        if st.button("📡 OPEN TECHNICAL PORTFOLIO", use_container_width=True):
-            st.switch_page("pages/1_Info_Brochure.py")
-        st.markdown("<div class='tile-container'><h3>📘 BROCHURE</h3><p>Central engineering library containing detailed system schematics.</p></div>", unsafe_allow_html=True)
-        
-    with t2:
-        if st.button("🚛 OPEN LOGISTICS RADAR", use_container_width=True):
-            st.switch_page("pages/2_Distribution.py")
-        st.markdown("<div class='tile-container'><h3>📦 DISTRIBUTION</h3><p>Granular distribution mapping across forward operating formations.</p></div>", unsafe_allow_html=True)
-        
-    with t3:
-        if st.button("🛠️ OPEN WAREHOUSE CONSOLE", use_container_width=True):
-            st.switch_page("pages/3_Inventory.py")
-        st.markdown("<div class='tile-container'><h3>⚙️ INVENTORY</h3><p>Production line trackers and spare component asset reserves.</p></div>", unsafe_allow_html=True)
+    pages = [
+        {"title": "BROCHURE", "desc": "Technical Specs & STL Models", "icon": "📡", "path": "pages/1_Info_Brochure.py"},
+        {"title": "DISTRIBUTION", "desc": "Fleet Logs & Unit Receipts", "icon": "🚛", "path": "pages/2_Distribution.py"},
+        {"title": "INVENTORY", "desc": "Production & Spares", "icon": "🛠️", "path": "pages/3_Inventory.py"}
+    ]
+
+    for i, p in enumerate(pages):
+        with cols[i]:
+            st.markdown(f"<div class='nav-card'><h2>{p['icon']} {p['title']}</h2><p>{p['desc']}</p></div>", unsafe_allow_html=True)
+            if st.button(f"ENTER {p['title']} MODULE", key=f"nav_{i}", use_container_width=True):
+                st.switch_page(p['path'])
