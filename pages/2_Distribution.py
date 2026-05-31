@@ -3,32 +3,38 @@ import sqlite3
 import pandas as pd
 
 st.set_page_config(page_title="Distribution", layout="wide")
-st.title("🚛 DISTRIBUTION TABLEAU")
+
+st.markdown("""
+    <style>
+    .stApp { background-color: #0e1117; }
+    h1, h2, h3 { color: #00d4ff !important; font-family: 'Courier New'; text-transform: uppercase; }
+    </style>
+    """, unsafe_allow_html=True)
+
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.stop()
+
+st.title("🚛 ASSET DISTRIBUTION LOGS")
 conn = sqlite3.connect('database.db')
 
-# Unit Selection for Detail View
-unit_data = pd.read_sql_query("SELECT unit_id, unit_name FROM Units WHERE unit_id != 1", conn)
-target_unit = st.selectbox("SELECT FORMATION FOR DETAILED DOSSIER", options=unit_data['unit_id'].tolist(), format_func=lambda x: dict(zip(unit_data.unit_id, unit_data.unit_name))[x])
+if st.session_state.role in ['Manufacturer', 'Corps_Commander']:
+    st.subheader("🔍 FLEET SEARCH & FILTER")
+    c1, c2 = st.columns(2)
+    units = pd.read_sql_query("SELECT unit_name FROM Units WHERE unit_id != 1", conn)['unit_name'].tolist()
+    models = pd.read_sql_query("SELECT model_name FROM Drone_Models", conn)['model_name'].tolist()
+    
+    sel_unit = c1.multiselect("FILTER BY UNIT", ["ALL"] + units, default="ALL")
+    sel_model = c2.multiselect("FILTER BY MODEL", ["ALL"] + models, default="ALL")
 
-# The Tableau (Detailed Dataframe)
-query = "SELECT model_name, serial_number, status, issue_date, auth_letter FROM Distributed_Assets WHERE assigned_unit_id = ?"
-df = pd.read_sql_query(query, conn, params=(target_unit,))
-
-if not df.empty:
+    query = "SELECT d.serial_number, d.model_name, u.unit_name, d.status FROM Distributed_Assets d JOIN Units u ON d.assigned_unit_id = u.unit_id"
+    df = pd.read_sql_query(query, conn)
+    
+    if "ALL" not in sel_unit: df = df[df['unit_name'].isin(sel_unit)]
+    if "ALL" not in sel_model: df = df[df['model_name'].isin(sel_model)]
+    
     st.dataframe(df, use_container_width=True, hide_index=True)
-else:
-    st.info("No active assets currently deployed to this unit.")
+    
+    st.subheader("📊 DISTRIBUTION SUMMARY")
+    st.table(df.groupby(['unit_name', 'model_name']).size().reset_index(name='Quantity'))
 
-# User Unit Receipt Reporting
-if st.session_state.role == 'User_Unit':
-    st.divider()
-    with st.form("receipt"):
-        st.subheader("📬 LOG NEW RECEIPT")
-        m = st.text_input("Model")
-        sn = st.text_input("Serial Number")
-        let = st.text_input("Auth Letter No.")
-        if st.form_submit_button("SUBMIT FOR ADMIN APPROVAL"):
-            conn.execute("INSERT INTO Receipt_Requests (model_name, serial_number, unit_id, letter_number, status) VALUES (?,?,?,?,'Pending')", (m, sn, st.session_state.unit_id, let))
-            conn.commit()
-            st.success("Request sent to HQ.")
 conn.close()
