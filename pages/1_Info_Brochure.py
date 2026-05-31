@@ -2,48 +2,46 @@ import streamlit as st
 import sqlite3
 import os
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Technical Dossier", layout="wide")
+st.markdown("<style>.stApp { background-color: #0e1117; } h1, h3 { color: #00d4ff !important; }</style>", unsafe_allow_html=True)
 
-# Secure access: Only Manufacturer can edit
-is_admin = st.session_state.get('role') == 'Manufacturer'
+if not st.session_state.get('logged_in'): st.stop()
 
 st.title("📡 DRONE TECHNICAL DOSSIER")
-
 conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 
-if is_admin:
+# Admin Upload Section
+if st.session_state.role == 'Manufacturer':
     with st.expander("➕ REGISTER NEW PLATFORM", expanded=False):
-        with st.form("add_drone"):
-            name = st.text_input("PLATFORM NAME")
-            role = st.text_input("ROLE")
-            img = st.file_uploader("UPLOAD SYSTEM IMAGE", type=['png', 'jpg', 'jpeg'])
-            specs = st.text_area("TECHNICAL SPECS")
-            if st.form_submit_button("SAVE TO DOSSIER"):
-                img_path = f"drone_media/{name}.png" if img else ""
+        with st.form("new_drone"):
+            name = st.text_input("Name")
+            role = st.text_input("Role")
+            specs = st.text_area("Technical Specs")
+            img = st.file_uploader("Upload Image", type=['png', 'jpg'])
+            if st.form_submit_button("PUBLISH"):
+                path = "None"
                 if img:
-                    if not os.path.exists("drone_media"): os.makedirs("drone_media")
-                    with open(img_path, "wb") as f: f.write(img.getbuffer())
-                
-                cursor.execute("INSERT INTO Drone_Models (model_name, role_type, technical_specs, image_path) VALUES (?,?,?,?)", 
-                               (name, role, specs, img_path))
+                    path = f"drone_media/{img.name}"
+                    with open(path, "wb") as f: f.write(img.getbuffer())
+                cursor.execute("INSERT INTO Drone_Models (model_name, role_type, technical_specs, image_path) VALUES (?,?,?,?)", (name, role, specs, path))
                 conn.commit()
                 st.rerun()
 
-# Display Grid
-drones = cursor.execute("SELECT model_name, role_type, technical_specs, image_path FROM Drone_Models").fetchall()
-for d in drones:
+# Display Section
+records = cursor.execute("SELECT model_name, role_type, technical_specs, image_path FROM Drone_Models").fetchall()
+for r in records:
     with st.container():
-        c1, c2, c3 = st.columns([1.5, 2, 1.5])
-        with c1:
-            if d[3] and os.path.exists(d[3]): st.image(d[3])
-            else: st.info("NO IMAGE AVAILABLE")
-        with c2:
-            st.subheader(d[0])
-            st.caption(f"Role: {d[1]}")
-            st.write(d[2])
-        with c3:
+        col1, col2, col3 = st.columns([1.5, 2, 1.5])
+        with col1:
+            if r[3] != "None" and os.path.exists(r[3]): st.image(r[3])
+            else: st.info("No Image")
+        with col2:
+            st.subheader(r[0])
+            st.write(f"**Role:** {r[1]}")
+            st.write(r[2])
+        with col3:
             st.markdown("**3D TELEMETRY**")
-            st.button("VIEW STL MODEL (Phase 2)", disabled=True, use_container_width=True)
+            st.button("INITIALIZE 3D RENDER", key=f"btn_{r[0]}", disabled=True)
         st.divider()
 conn.close()
