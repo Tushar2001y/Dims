@@ -1,6 +1,9 @@
 import streamlit as st
 import sqlite3
 
+import db_setup
+db_setup.init_db()
+
 st.set_page_config(page_title="Global Drone Portal", layout="centered")
 
 # --- Database Connection ---
