@@ -1,73 +1,69 @@
 import streamlit as st
 import sqlite3
+import db_setup
 import os
 
-# --- DATABASE AUTO-FIX ---
-def check_db():
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    # Ensure Receipt_Requests exists to fix the red error
-    cursor.execute('''CREATE TABLE IF NOT EXISTS Receipt_Requests (
-                        receipt_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        model_name TEXT, serial_number TEXT, unit_id INTEGER,
-                        arrival_date TEXT, letter_number TEXT, status TEXT)''')
-    # Ensure images column exists in Drone_Models if not already there
-    try:
-        cursor.execute("ALTER TABLE Drone_Models ADD COLUMN image_path TEXT")
-    except:
-        pass 
-    conn.commit()
-    conn.close()
+db_setup.init_db()
 
-check_db()
+st.set_page_config(page_title="EME Drone Command", layout="wide", initial_sidebar_state="expanded")
 
-st.set_page_config(page_title="EME Drone Command", layout="wide")
-
-# Tactical CSS for clickable tiles
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; color: #e0e0e0; }
-    [data-testid="stSidebar"] { background-color: #1a1c24 !important; }
-    .nav-card {
-        background: #1a1c24;
-        padding: 30px;
-        border-left: 5px solid #00d4ff;
-        border-radius: 4px;
-        text-align: center;
-        transition: 0.3s;
-    }
-    .nav-card:hover { border-left: 10px solid #00d4ff; background: #252932; cursor: pointer; }
+    [data-testid="stSidebar"] { background-color: #1a1c24 !important; border-right: 2px solid #00d4ff1a; }
+    h1, h2, h3 { color: #00d4ff !important; font-family: 'Courier New'; text-transform: uppercase; letter-spacing: 2px; }
+    .stButton>button { border: 1px solid #00d4ff !important; background-color: #1a1c24 !important; color: #00d4ff !important; border-radius: 0px !important; }
+    .stButton>button:hover { background-color: #00d4ff !important; color: #0e1117 !important; box-shadow: 0 0 15px #00d4ff; }
+    .metric-card { background: #1a1c24; padding: 15px; border-left: 5px solid #00d4ff; border-radius: 4px; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# Sidebar with Logo
 with st.sidebar:
     if os.path.exists("eme_logo.png"):
         st.image("eme_logo.png", width=150)
+    
     if st.session_state.get('logged_in'):
+        st.page_link("Home.py", label="🏠 RETURN TO HQ", use_container_width=True)
+        st.divider()
         st.markdown(f"**OPERATOR:** {st.session_state.username}")
-        if st.button("LOGOUT"):
+        st.markdown(f"**CORPS:** EME | {st.session_state.role}")
+        if st.button("TERMINATE SESSION"):
             st.session_state.logged_in = False
             st.rerun()
 
-# Login / Dashboard Logic
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    # ... (Keep your existing Login Form here) ...
-    if st.button("SECURE LOGIN (MOCK)"): # Placeholder for your actual login logic
-        st.session_state.update({'logged_in': True, 'role': 'Manufacturer', 'username': 'admin', 'unit_id': 1})
-        st.rerun()
-else:
-    st.title("TACTICAL COMMAND DASHBOARD")
-    cols = st.columns(3)
-    
-    pages = [
-        {"title": "BROCHURE", "desc": "Technical Specs & STL Models", "icon": "📡", "path": "pages/1_Info_Brochure.py"},
-        {"title": "DISTRIBUTION", "desc": "Fleet Logs & Unit Receipts", "icon": "🚛", "path": "pages/2_Distribution.py"},
-        {"title": "INVENTORY", "desc": "Production & Spares", "icon": "🛠️", "path": "pages/3_Inventory.py"}
-    ]
+def verify_login(u, p):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, role, unit_id FROM Users WHERE username=? AND password=?", (u, p))
+    user = cursor.fetchone()
+    conn.close()
+    return user
 
-    for i, p in enumerate(pages):
-        with cols[i]:
-            st.markdown(f"<div class='nav-card'><h2>{p['icon']} {p['title']}</h2><p>{p['desc']}</p></div>", unsafe_allow_html=True)
-            if st.button(f"ENTER {p['title']} MODULE", key=f"nav_{i}", use_container_width=True):
-                st.switch_page(p['path'])
+if 'logged_in' not in st.session_state:
+    st.session_state.update({'logged_in': False, 'role': None, 'unit_id': None, 'username': None})
+
+if not st.session_state.logged_in:
+    st.markdown("<h1 style='text-align: center;'>EME DRONE FACILITY PORTAL</h1>", unsafe_allow_html=True)
+    _, login_col, _ = st.columns([1,2,1])
+    with login_col:
+        with st.form("login"):
+            u = st.text_input("USER ID")
+            p = st.text_input("ACCESS KEY", type="password")
+            if st.form_submit_button("AUTHORIZE"):
+                user = verify_login(u, p)
+                if user:
+                    st.session_state.update({'logged_in': True, 'user_id': user[0], 'role': user[1], 'unit_id': user[2], 'username': u})
+                    st.rerun()
+                else: st.error("INVALID CREDENTIALS")
+else:
+    st.markdown(f"<h1>FACILITY OVERVIEW: {st.session_state.role}</h1>", unsafe_allow_html=True)
+    t1, t2, t3 = st.columns(3)
+    with t1:
+        st.markdown("<div class='metric-card'><h3>📘 BROCHURE</h3><p>Technical Specs</p></div>", unsafe_allow_html=True)
+        st.page_link("pages/1_Info_Brochure.py", label="VIEW BROCHURE", icon="📡")
+    with t2:
+        st.markdown("<div class='metric-card'><h3>📦 DISTRIBUTION</h3><p>Unit Asset Logs</p></div>", unsafe_allow_html=True)
+        st.page_link("pages/2_Distribution.py", label="VIEW DISTRIBUTION", icon="🚛")
+    with t3:
+        st.markdown("<div class='metric-card'><h3>⚙️ INVENTORY</h3><p>Production & Spares</p></div>", unsafe_allow_html=True)
+        st.page_link("pages/3_Inventory.py", label="VIEW INVENTORY", icon="🛠️")
