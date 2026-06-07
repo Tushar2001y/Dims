@@ -107,10 +107,26 @@ def init_db():
             p_id = p_row[0] if p_row else None
         cursor.execute("INSERT OR IGNORE INTO Org_Structure (node_name, node_type, parent_id) VALUES (?, ?, ?)", (name, n_type, p_id))
     
-    # --- 4. PROVISION ADMIN ACCOUNT ---
-    cursor.execute("SELECT node_id FROM Org_Structure WHERE node_name='9 Corps'")
-    corps_node = cursor.fetchone()[0]
-    cursor.execute("INSERT OR IGNORE INTO Users (username, password, role, node_id) VALUES ('admin', 'admin123', 'Admin', ?)", (corps_node,))
+    #     # --- 4. PROVISION MASTER & TEST USER ACCOUNTS ---
+    
+    # Helper to get node IDs for account linking
+    def get_node_id(node_name):
+        cursor.execute("SELECT node_id FROM Org_Structure WHERE node_name=?", (node_name,))
+        res = cursor.fetchone()
+        return res[0] if res else 1
+
+    accounts = [
+        # (Username, Password, Role, Target Node Name)
+        ('admin', 'admin123', 'Admin', '9 Corps'),
+        ('div_29', 'pass123', 'User_Unit', '29 Div'),
+        ('bde_a', 'pass123', 'User_Unit', 'A Bde'),
+        ('para_11', 'pass123', 'User_Unit', '11th Para SF')
+    ]
+    
+    for u_name, pwd, role, node_target in accounts:
+        target_id = get_node_id(node_target)
+        cursor.execute("INSERT OR IGNORE INTO Users (username, password, role, node_id) VALUES (?, ?, ?, ?)", (u_name, pwd, role, target_id))
+
     
     # --- 5. REGISTER DRONE PLATFORMS ---
     cursor.execute("INSERT INTO Drone_Models (model_name, role_type, flight_time, payload_capacity, technical_specs) VALUES ('Navastra 51', 'Surveillance & Target Acquisition', '60 Mins', '2.5 kg', 'EO/IR sensor payload, encrypted 5G telemetry, anti-jamming GPS module.')")
