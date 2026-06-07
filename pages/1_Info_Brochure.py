@@ -1,7 +1,81 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-import os
+import os# pages/1_Info_Brochure.py
+import streamlit as st
+import sqlite3
+import pandas as pd
+
+st.set_page_config(page_title="DIMS - Technical Dossier", layout="wide")
+
+st.markdown("""
+    <style>
+    .stApp { background-color: #f8fafc; color: #0f172a; }
+    h1, h2, h3 { color: #0f172a !important; font-family: 'Inter', sans-serif; font-weight: 600; }
+    .info-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .spec-badge {
+        background-color: #f1f5f9;
+        color: #475569;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-block;
+        margin-bottom: 6px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.warning("⚠️ Access Denied: Secure Login Required")
+    st.stop()
+
+st.title("DIMS - Drone Technical Dossier")
+conn = sqlite3.connect('database.db')
+cursor = conn.cursor()
+
+try:
+    cursor.execute("SELECT model_name, role_type, flight_time, payload_capacity, technical_specs FROM Drone_Models")
+    records = cursor.fetchall()
+except sqlite3.OperationalError:
+    records = []
+
+if records:
+    # Track looping indexes clean to fully evade the StreamlitDuplicateElementId bug
+    for idx, row in enumerate(records):
+        name, role, endurance, payload, raw_specs = row
+        
+        parsed_specs = raw_specs.split(" | Image: ")[0] if raw_specs and " | Image: " in raw_specs else raw_specs
+
+        st.markdown(f"<div class='info-card'>", unsafe_allow_html=True)
+        st.subheader(name)
+        
+        c1, c2, c3 = st.columns([1.5, 3, 2])
+        with c1:
+            st.markdown("<div style='background-color:#f8fafc; border:1px dashed #cbd5e1; height:140px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:12px;'>NO IMAGE AVAILABLE</div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"<span class='spec-badge'>Role: {role}</span>", unsafe_allow_html=True)
+            st.write(f"**Max Flight Endurance:** {endurance}")
+            st.write(f"**Payload Threshold Bound:** {payload}")
+            st.write(f"**Schematic Parameters:** {parsed_specs}")
+        with c3:
+            st.markdown("<p style='font-size:12px; color:#64748b; font-weight:500; margin-bottom:4px;'>3D TELEMETRY MESH</p>", unsafe_allow_html=True)
+            # UNIQUE ELEMENT ID KEY BINDING: Appending row index ensures identity uniqueness 
+            st.button("VIEW STL MODEL (Phase 2)", disabled=True, use_container_width=True, key=f"btn_stl_render_{idx}")
+            
+        st.markdown("</div>", unsafe_allow_html=True)
+else:
+    st.info("The technical dossier registry is empty.")
+
+conn.close()
+
 
 st.set_page_config(page_title="Technical Dossier", layout="wide")
 
