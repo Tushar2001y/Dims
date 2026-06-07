@@ -1,69 +1,82 @@
+# Home.py
 import streamlit as st
 import sqlite3
 import db_setup
-import os
 
 db_setup.init_db()
 
-st.set_page_config(page_title="EME Drone Command", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="DIMS - Dashboard", layout="wide", initial_sidebar_state="expanded")
 
+# Inject Custom Dashboard Stylesheet mirroring the target sample layout
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: #e0e0e0; }
-    [data-testid="stSidebar"] { background-color: #1a1c24 !important; border-right: 2px solid #00d4ff1a; }
-    h1, h2, h3 { color: #00d4ff !important; font-family: 'Courier New'; text-transform: uppercase; letter-spacing: 2px; }
-    .stButton>button { border: 1px solid #00d4ff !important; background-color: #1a1c24 !important; color: #00d4ff !important; border-radius: 0px !important; }
-    .stButton>button:hover { background-color: #00d4ff !important; color: #0e1117 !important; box-shadow: 0 0 15px #00d4ff; }
-    .metric-card { background: #1a1c24; padding: 15px; border-left: 5px solid #00d4ff; border-radius: 4px; margin-bottom: 10px; }
+    /* Global Background Adjustments */
+    .stApp { background-color: #f8fafc; color: #0f172a; }
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
+    
+    /* Clean, Modern Typography */
+    h1, h2, h3 { color: #0f172a !important; font-family: 'Inter', -apple-system, sans-serif !important; font-weight: 600 !important; }
+    
+    /* Style Custom Info Cards */
+    .dashboard-card {
+        background-color: #ffffff;
+        padding: 24px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        margin-bottom: 16px;
+    }
+    .card-title { color: #64748b; font-size: 14px; text-transform: uppercase; font-weight: 500; }
+    .card-value { color: #0f172a; font-size: 28px; font-weight: 700; margin-top: 4px; }
     </style>
     """, unsafe_allow_html=True)
 
+if 'logged_in' not in st.session_state:
+    st.session_state.update({'logged_in': False, 'role': None, 'node_id': None, 'username': None})
+
 with st.sidebar:
-    if os.path.exists("eme_logo.png"):
-        st.image("eme_logo.png", width=150)
+    st.markdown("<h2 style='color:#2563eb !important; margin-bottom:0;'>📦 D-dims</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#64748b; font-size:12px; margin-top:0; margin-bottom:24px;'>Drone Inventory Management System</p>", unsafe_allow_html=True)
     
-    if st.session_state.get('logged_in'):
-        st.page_link("Home.py", label="🏠 RETURN TO HQ", use_container_width=True)
+    if st.session_state.logged_in:
+        st.page_link("Home.py", label="📊 Dashboard Console", use_container_width=True)
+        st.page_link("pages/1_Info_Brochure.py", label="📡 Technical Dossier", use_container_width=True)
+        st.page_link("pages/2_Distribution.py", label="🚛 Fleet Deployment", use_container_width=True)
+        st.page_link("pages/3_Inventory.py", label="🛠️ Inventory & Assembly", use_container_width=True)
         st.divider()
-        st.markdown(f"**OPERATOR:** {st.session_state.username}")
-        st.markdown(f"**CORPS:** EME | {st.session_state.role}")
-        if st.button("TERMINATE SESSION"):
-            st.session_state.logged_in = False
+        st.markdown(f"<p style='font-size:13px; color:#64748b; margin-bottom:0;'>User Profile:</p><strong style='color:#0f172a;'>{st.session_state.username} ({st.session_state.role})</strong>", unsafe_allow_html=True)
+        if st.button("Log Out Session", use_container_width=True):
+            st.session_state.update({'logged_in': False, 'role': None, 'node_id': None, 'username': None})
             st.rerun()
 
-def verify_login(u, p):
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, role, unit_id FROM Users WHERE username=? AND password=?", (u, p))
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
-if 'logged_in' not in st.session_state:
-    st.session_state.update({'logged_in': False, 'role': None, 'unit_id': None, 'username': None})
-
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center;'>EME DRONE FACILITY PORTAL</h1>", unsafe_allow_html=True)
-    _, login_col, _ = st.columns([1,2,1])
+    st.markdown("<h1 style='text-align: center; margin-top: 40px;'>Sign in to DIMS</h1>", unsafe_allow_html=True)
+    _, login_col, _ = st.columns([1.2, 1.5, 1.2])
     with login_col:
-        with st.form("login"):
-            u = st.text_input("USER ID")
-            p = st.text_input("ACCESS KEY", type="password")
-            if st.form_submit_button("AUTHORIZE"):
-                user = verify_login(u, p)
-                if user:
-                    st.session_state.update({'logged_in': True, 'user_id': user[0], 'role': user[1], 'unit_id': user[2], 'username': u})
+        with st.form("dims_login_gate"):
+            u = st.text_input("Username / Command Assignment")
+            p = st.text_input("Secure Access Key", type="password")
+            if st.form_submit_button("Validate Credentials", use_container_width=True):
+                conn = sqlite3.connect('database.db')
+                cursor = conn.cursor()
+                cursor.execute("SELECT user_id, role, node_id FROM Users WHERE username=? AND password=?", (u, p))
+                res = cursor.fetchone()
+                conn.close()
+                if res:
+                    st.session_state.update({'logged_in': True, 'role': res[1], 'node_id': res[2], 'username': u})
                     st.rerun()
-                else: st.error("INVALID CREDENTIALS")
+                else:
+                    st.error("Authentication breach: Invalid credentials.")
 else:
-    st.markdown(f"<h1>FACILITY OVERVIEW: {st.session_state.role}</h1>", unsafe_allow_html=True)
-    t1, t2, t3 = st.columns(3)
-    with t1:
-        st.markdown("<div class='metric-card'><h3>📘 BROCHURE</h3><p>Technical Specs</p></div>", unsafe_allow_html=True)
-        st.page_link("pages/1_Info_Brochure.py", label="VIEW BROCHURE", icon="📡")
-    with t2:
-        st.markdown("<div class='metric-card'><h3>📦 DISTRIBUTION</h3><p>Unit Asset Logs</p></div>", unsafe_allow_html=True)
-        st.page_link("pages/2_Distribution.py", label="VIEW DISTRIBUTION", icon="🚛")
-    with t3:
-        st.markdown("<div class='metric-card'><h3>⚙️ INVENTORY</h3><p>Production & Spares</p></div>", unsafe_allow_html=True)
-        st.page_link("pages/3_Inventory.py", label="VIEW INVENTORY", icon="🛠️")
+    st.markdown("<h1>Dashboard Overview</h1>", unsafe_allow_html=True)
+    
+    # Clean Metric Layout Rows matching target sample look
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.markdown("<div class='dashboard-card'><div class='card-title'>Total Active Fleet</div><div class='card-value'>389 Units</div></div>", unsafe_allow_html=True)
+    with m2:
+        st.markdown("<div class='dashboard-card'><div class='card-title'>Pending Inbound Requests</div><div class='card-value'>12 Indents</div></div>", unsafe_allow_html=True)
+    with m3:
+        st.markdown("<div class='dashboard-card'><div class='card-title'>System Operational Readiness</div><div class='card-value'>98.4%</div></div>", unsafe_allow_html=True)
+        
+    st.info("💡 Welcome to DIMS. Use the sidebar navigation console to monitor technical dossiers, adjust inventory stocks, or authorize field distributions across the 9 Corps operational zone.")
