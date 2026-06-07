@@ -2,66 +2,98 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+from datetime import datetime
 
-st.set_page_config(page_title="DIMS Grievance Desk", layout="wide")
-st.markdown("<style>.stApp { background-color: #0e1117; } h1, h2, h3 { color: #00d4ff !important; font-family: 'Courier New'; }</style>", unsafe_allow_html=True)
+st.set_page_config(page_title="DIMS - Grievances", layout="wide")
+
+# --- UNIFIED DASHBOARD CSS ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #f8fafc; color: #0f172a; }
+    h1, h2, h3 { color: #0f172a !important; font-family: 'Inter', sans-serif; font-weight: 600; }
+    .ticket-card {
+        background-color: #ffffff; padding: 20px; border-radius: 12px;
+        border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 16px;
+    }
+    .badge-open { background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;}
+    .badge-closed { background-color: #dcfce3; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;}
+    </style>
+    """, unsafe_allow_html=True)
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("⚠️ ACCESS DENIED")
+    st.warning("⚠️ Access Denied: Secure Login Required")
     st.stop()
 
-st.title("🛠️ COMPONENT DEFECT & GRIEVANCE REDRESSAL DESK")
-
-# --- EXPERT AI DIAGNOSTIC ENGINE (DETERMINISTIC LLM LAYER) ---
-def query_tactical_llm(subject, description):
-    context_pool = {
-        "telemetry": "⚡ SYSTEM DIAGNOSTIC ANALYSIS: Detected compass variance calibration error. RECOMMENDATION: Re-run IMU stabilization sequence on clean horizontal orientation vector away from structural iron blocks before flight.",
-        "payload": "📦 SYSTEM DIAGNOSTIC ANALYSIS: Current drop clamp interface reports mechanical power resistance. RECOMMENDATION: Clean locking pins with chemical cleaner and cross-verify physical latch continuity.",
-        "5g": "📡 SYSTEM DIAGNOSTIC ANALYSIS: 5G Handshake latency exceeding limits. RECOMMENDATION: Verify active network SIM binding profiles and inspect condition of local high-gain receiver components."
-    }
-    for trigger, resolution in context_pool.items():
-        if trigger in subject.lower() or trigger in description.lower():
-            return resolution
-    return "⚙️ ANALYSIS COMPLETION: Issue registered safely inside the system logs. Diagnostic criteria indeterminate. System is routing issue details to Manufacturer Admin queue for technical resolution."
-
-# --- TICKET SUBMISSION GATEWAY ---
-with st.form("grievance_submission", clear_on_submit=True):
-    st.subheader("📬 LOG NEW TACTICAL SYSTEM DEFECT SUMMARY")
-    sub = st.text_input("FAULT SYSTEM SUBJECT MATTER (e.g., 5G Transceiver Latency)")
-    desc = st.text_area("DETAILED ANOMALY LOG DESCRIPTION")
-    
-    if st.form_submit_button("INITIALIZE RENDER FOR CELL REVIEW"):
-        if sub and desc:
-            ai_verdict = query_tactical_llm(sub, desc)
-            
-            conn = sqlite3.connect('database.db')
-            cursor = conn.cursor()
-            cursor.execute("""INSERT INTO Grievances (user_id, username, node_id, subject, description, ai_resolution_summary) 
-                              VALUES (?, ?, ?, ?, ?, ?)""", 
-                           (st.session_state.node_id, st.session_state.username, st.session_state.node_id, sub, desc, ai_verdict))
-            conn.commit()
-            conn.close()
-            
-            st.subheader("🤖 AUTOMATED ASSISTANT RESOLUTION FEEDBACK")
-            st.info(ai_verdict)
-        else:
-            st.error("Ensure both input fault fields are fully declared.")
-
-st.divider()
-
-# --- HISTORICAL LEDGER DISCOVERY ---
-st.subheader("📋 TICKET REPOSITORY RECORDS")
+st.title("🛡️ Grievance & Maintenance Ticketing")
 conn = sqlite3.connect('database.db')
+cursor = conn.cursor()
 
-if st.session_state.role == 'Admin':
-    # Admins inspect all technical grievances across the enterprise
-    ledger_df = pd.read_sql_query("SELECT ticket_id, username, subject, description, ai_resolution_summary, status FROM Grievances", conn)
-else:
-    # Subordinate units can track only their own filed tickers
-    ledger_df = pd.read_sql_query("SELECT ticket_id, subject, description, ai_resolution_summary, status FROM Grievances WHERE user_id=?", conn, params=(st.session_state.node_id,))
+# Auto-create the Grievances table if it doesn't exist yet
+cursor.execute('''CREATE TABLE IF NOT EXISTS Grievances (
+                    ticket_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    submitter TEXT,
+                    category TEXT,
+                    hardware_sn TEXT,
+                    description TEXT,
+                    status TEXT DEFAULT 'Open',
+                    submission_date TEXT,
+                    resolution_notes TEXT)''')
+conn.commit()
 
-if not ledger_df.empty:
-    st.dataframe(ledger_df, use_container_width=True, hide_index=True)
+current_role = st.session_state.get('role', 'User_Unit')
+current_user = st.session_state.get('username', 'Unknown')
+
+# --- WORKFLOW 1: ADMIN RESOLUTION DASHBOARD ---
+if current_role == 'Admin':
+    st.subheader("📋 Active Support Tickets")
+    
+    open_tickets = pd.read_sql_query("SELECT * FROM Grievances WHERE status='Open'", conn)
+    
+    if not open_tickets.empty:
+        for idx, row in open_tickets.iterrows():
+            st.markdown(f"<div class='ticket-card'>", unsafe_allow_html=True)
+            st.markdown(f"<span class='badge-open'>OPEN TICKET #{row['ticket_id']}</span>", unsafe_allow_html=True)
+            st.markdown(f"**Reported by:** {row['submitter']} | **Category:** {row['category']} | **S/N:** {row['hardware_sn']}")
+            st.markdown(f"**Issue Description:** {row['description']}")
+            st.markdown(f"**Date:** {row['submission_date']}")
+            
+            with st.form(key=f"resolve_form_{row['ticket_id']}"):
+                resolution = st.text_area("Admin Resolution Notes")
+                if st.form_submit_button("Mark as Resolved & Close Ticket"):
+                    cursor.execute("UPDATE Grievances SET status='Resolved', resolution_notes=? WHERE ticket_id=?", (resolution, row['ticket_id']))
+                    conn.commit()
+                    st.toast(f"Ticket #{row['ticket_id']} resolved successfully.")
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.info("Excellent. No open grievances or maintenance tickets at this time.")
+        
+    st.divider()
+    st.subheader("🗄️ Resolved Tickets Archive")
+    closed_tickets = pd.read_sql_query("SELECT ticket_id AS [Ticket #], submitter AS [Unit], category AS [Category], hardware_sn AS [Serial], resolution_notes AS [Resolution] FROM Grievances WHERE status='Resolved'", conn)
+    if not closed_tickets.empty:
+        st.dataframe(closed_tickets, use_container_width=True, hide_index=True)
+
+# --- WORKFLOW 2: USER SUBMISSION FORM ---
 else:
-    st.success("Log record matrix clear: No anomalies logged across current operational sectors.")
+    st.markdown("Submit maintenance alerts, damaged payload reports, or logistical delays directly to the Central Command dashboard.")
+    
+    with st.form("grievance_submission_form", clear_on_submit=True):
+        st.markdown("<div class='ticket-card'>", unsafe_allow_html=True)
+        g_cat = st.selectbox("Issue Category", ["Hardware Damage", "Software/Telemetry Failure", "Missing Parts", "Logistics Delay", "Other"])
+        g_sn = st.text_input("Associated Hardware Serial Number (If applicable)", placeholder="e.g., SN-NV51-26-001")
+        g_desc = st.text_area("Detailed Issue Description")
+        
+        if st.form_submit_button("Submit Grievance to Command", use_container_width=True):
+            if g_desc:
+                cursor.execute("""
+                    INSERT INTO Grievances (submitter, category, hardware_sn, description, submission_date) 
+                    VALUES (?, ?, ?, ?, ?)""", 
+                    (current_user, g_cat, g_sn, g_desc, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                conn.commit()
+                st.success("Your ticket has been securely transmitted to Logistics Command.")
+            else:
+                st.error("Please provide a detailed description of the issue.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
 conn.close()
