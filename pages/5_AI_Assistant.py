@@ -26,7 +26,7 @@ with st.sidebar:
         st.page_link("pages/2_Distribution.py", label="🚛 Fleet Deployment", use_container_width=True)
         st.page_link("pages/3_Inventory.py", label="🛠️ Inventory & Assembly", use_container_width=True)
         # Adjust the filename below to exactly match your AI assistant python file
-        st.page_link("pages/4_AI_Assistant.py", label="🤖 AI Assistant", use_container_width=True)
+        st.page_link("pages/5_AI_Assistant.py", label="🤖 AI Assistant", use_container_width=True)
         
         st.divider()
         st.markdown("<p style='font-size:13px; color:#64748b; margin-bottom:4px;'>Copilot Configuration:</p>", unsafe_allow_html=True)
