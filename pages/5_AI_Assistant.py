@@ -1,4 +1,61 @@
-import streamlit as st
+import streamlit as stimport streamlit as st
+import google.generativeai as genai
+
+st.set_page_config(page_title="DIMS - AI Copilot", layout="wide", initial_sidebar_state="expanded")
+
+# --- CUSTOM STYLING ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
+    h1, h2, h3, h4 { color: #0f172a !important; font-family: 'Inter', -apple-system, sans-serif !important; font-weight: 600 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.markdown("<h2 style='color:#2563eb !important; margin-bottom:0;'>📦 D-dims</h2>", unsafe_allow_html=True)
+    if st.session_state.get('logged_in', False):
+        st.page_link("Home.py", label="📊 Dashboard Console", use_container_width=True)
+        st.page_link("pages/1_Info_Brochure.py", label="📡 Technical Dossier", use_container_width=True)
+        st.page_link("pages/5_AI_Assistant.py", label="🤖 AI Assistant", use_container_width=True)
+        st.divider()
+        st.markdown(f"User: **{st.session_state.username}**")
+
+# --- AI LOGIC ---
+if not st.session_state.get('logged_in', False):
+    st.warning("⚠️ Authentication required.")
+else:
+    st.markdown("<h1>🤖 DIMS AI Logistics Copilot</h1>", unsafe_allow_html=True)
+
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "Copilot online. How can I assist with logistics?"}]
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Ask about Navastra specs..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        try:
+            # ACCESSING THE SECURE KEY
+            api_key = st.secrets["GEMINI_API_KEY"]
+            genai.configure(api_key=api_key)
+            
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing..."):
+                    response = model.generate_content(prompt)
+                    st.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
+            
+        except Exception as e:
+            st.error("Configuration Error: Ensure GEMINI_API_KEY is set in Streamlit Secrets.")
+
 import google.generativeai as genai
 
 st.set_page_config(page_title="DIMS - AI Copilot", layout="wide", initial_sidebar_state="expanded")
