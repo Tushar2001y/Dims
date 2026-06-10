@@ -4,7 +4,28 @@ import db_setup
 import pandas as pd
 import plotly.express as px
 
-db_setup.init_db()
+# Wrap the initialization in a cache decorator so it strictly executes only once
+@st.cache_resource
+def initialize_database():
+    db_setup.init_db()
+    return True
+
+initialize_database()
+
+st.set_page_config(page_title="DIMS - Dashboard", layout="wide", initial_sidebar_state="expanded")
+import streamlit as st
+import sqlite3
+import db_setup
+import pandas as pd
+import plotly.express as px
+
+# Wrap the initialization in a cache decorator so it strictly executes only once
+@st.cache_resource
+def initialize_database():
+    db_setup.init_db()
+    return True
+
+initialize_database()
 
 st.set_page_config(page_title="DIMS - Dashboard", layout="wide", initial_sidebar_state="expanded")
 
