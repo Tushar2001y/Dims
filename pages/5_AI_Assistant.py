@@ -1,12 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
-
-# ==========================================
-# ⚠️ TACTICAL OPSEC WARNING ⚠️
-# Hardcoding your API key here works, but if your GitHub repo is public,
-# this key will be exposed. 
-# ==========================================
-SYSTEM_API_KEY = "AQ.Ab8RN6ITmG7d4UGl2zw6BcM-JiEEY3lWH5CjJzItBSmrn8kXgw"
+from openai import OpenAI
 
 st.set_page_config(page_title="DIMS - AI Copilot", layout="wide", initial_sidebar_state="expanded")
 
@@ -16,13 +9,10 @@ st.markdown("""
     .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
     [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
     h1, h2, h3, h4 { color: #0f172a !important; font-family: 'Inter', -apple-system, sans-serif !important; font-weight: 600 !important; }
-    
-    /* Chat Input Styling */
-    .stChatInputContainer { padding-bottom: 20px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# Shared Sidebar Navigation (Input field removed)
+# Shared Sidebar Navigation
 with st.sidebar:
     st.markdown("<h2 style='color:#2563eb !important; margin-bottom:0;'>📦 D-dims</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color:#64748b; font-size:12px; margin-top:0; margin-bottom:24px;'>Drone Inventory Management System</p>", unsafe_allow_html=True)
@@ -33,9 +23,8 @@ with st.sidebar:
         st.page_link("pages/2_Distribution.py", label="🚛 Fleet Deployment", use_container_width=True)
         st.page_link("pages/3_Inventory.py", label="🛠️ Inventory & Assembly", use_container_width=True)
         st.page_link("pages/5_AI_Assistant.py", label="🤖 AI Assistant", use_container_width=True)
-        
         st.divider()
-        st.markdown(f"<p style='font-size:13px; color:#64748b; margin-bottom:0;'>User Profile:</p><strong style='color:#0f172a;'>{st.session_state.username} ({st.session_state.role})</strong>", unsafe_allow_html=True)
+        st.markdown(f"User Profile: **{st.session_state.username}**")
 
 # Main Application Logic
 if not st.session_state.get('logged_in', False):
@@ -47,7 +36,7 @@ else:
     # Initialize chat history in session state
     if "messages" not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": "Welcome to the DIMS AI Copilot. How can I assist you with drone inventory, Navastra deployments, or tactical logistics today?"}
+            {"role": "assistant", "content": "Copilot online. How can I assist you with drone inventory or tactical logistics today?"}
         ]
 
     # Display existing chat messages
@@ -64,36 +53,43 @@ else:
             st.markdown(prompt)
 
         try:
-            # Configure Gemini API with the hardcoded key
-            genai.configure(api_key=SYSTEM_API_KEY)
+            # 1. Verify that the Secret key exists in Streamlit Cloud Settings
+            if "GROQ_API_KEY" not in st.secrets:
+                st.error("Missing GROQ_API_KEY in Streamlit Secrets. Please add it to your App Settings.")
+                st.stop()
+                
+            # 2. Extract the key securely from env block
+            secret_key = st.secrets["GROQ_API_KEY"]
             
-            # Define system context to ground the AI in your specific logistics domain
-            system_instruction = """
-            You are the AI Logistics Copilot for DIMS (Drone Inventory Management System). 
-            You assist military and technical personnel with managing Unmanned Aerial Vehicles (UAVs).
-            Key assets include the NAVASTRA 51 (Surveillance, 60min endurance, 2.5kg payload) and 
-            NAVASTRA 81 (Heavy Payload/Loitering, 40min endurance, 12kg payload), as well as payload droppers 
-            and kamikaze variants. Provide concise, professional, and highly technical logistical advice.
-            """
+            # Route requests through Groq infrastructure using OpenAI standard client
+            client = OpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=secret_key
+            )
             
-            # Updated to use the more stable -latest endpoint
-            model = genai.GenerativeModel('gemini-1.5-flash-latest', system_instruction=system_instruction)
+            # Pack history cleanly for API execution
+            messages_payload = [
+                {
+                    "role": "system",
+                    "content": "You are the AI Logistics Copilot for DIMS. You manage military drone arrays including the NAVASTRA 51 and NAVASTRA 81. Keep solutions short, structured, and professional."
+                }
+            ]
             
-            # Format history for the Gemini SDK (omitting the first system greeting for clean API passing)
-            gemini_history = []
-            for msg in st.session_state.messages[1:-1]:
-                role = "user" if msg["role"] == "user" else "model"
-                gemini_history.append({"role": role, "parts": [msg["content"]]})
+            for msg in st.session_state.messages:
+                messages_payload.append({"role": msg["role"], "content": msg["content"]})
 
             # Stream response
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing logistics database..."):
-                    chat = model.start_chat(history=gemini_history)
-                    response = chat.send_message(prompt)
-                    st.markdown(response.text)
+                with st.spinner("Analyzing parameters..."):
+                    completion = client.chat.completions.create(
+                        model="llama3-8b-8192", 
+                        messages=messages_payload,
+                    )
+                    response_text = completion.choices[0].message.content
+                    st.markdown(response_text)
                     
             # Save assistant response to memory
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
+            st.session_state.messages.append({"role": "assistant", "content": response_text})
             
         except Exception as e:
             with st.chat_message("assistant"):
