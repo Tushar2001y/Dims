@@ -125,6 +125,11 @@ def init_db():
     cursor.execute("INSERT INTO Drone_Models (model_name, role_type, flight_time, payload_capacity, technical_specs) VALUES ('Navastra 81', 'Heavy Payload / Loitering Munition', '40 Mins', '12 kg', 'Terminal guidance, extended range antenna, modular payload bay.')")
     
     # --- 6. DISTRIBUTE ASSETS TO USER UNITS ---
+        # --- 6. DISTRIBUTE ASSETS TO USER UNITS ---
+    def get_unit_id(unit_name):
+        cursor.execute("SELECT node_id FROM Org_Structure WHERE node_name=?", (unit_name,))
+        res = cursor.fetchone()
+        return res[0] if res else 1
     assets_to_deploy = [
         # Navastra 51s
         ('Navastra 51', 'SN-NV51-26-001', get_unit_id('1st Infantry Bn'), 'Operational', '2026-05-10', '9C/LOG/A01'),
