@@ -1,3 +1,4 @@
 pandas
 plotly
 google-generativeai
+openai
