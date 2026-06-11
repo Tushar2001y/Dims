@@ -45,7 +45,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 if not st.session_state['logged_in']:
-    st.markdown("<h1 style='text-align: center; margin-top: 50px;'>📦 D-dims Access Terminal</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-top: 50px;'>📦 DIMS Access Terminal</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #64748b;'>Drone Inventory Management System</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 1, 1])
