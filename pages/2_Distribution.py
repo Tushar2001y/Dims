@@ -28,17 +28,27 @@ def get_authorized_node_ids(user_node_id, role):
     if role in ['Admin', 'Commander']:
         res = cursor.execute("SELECT node_id FROM Org_Structure").fetchall()
         return [r[0] for r in res]
+    
     user_node_id = int(user_node_id)
     all_nodes = cursor.execute("SELECT node_id, parent_id FROM Org_Structure").fetchall()
-    tree_map = {p: [n for n, parent in all_nodes if parent == p] for n, parent in all_nodes}
+    
+    # Safe, explicit dictionary mapping to completely avoid comprehension NameErrors
+    tree_map = {}
+    for n_id, p_id in all_nodes:
+        if p_id is not None:
+            tree_map.setdefault(int(p_id), []).append(int(n_id))
+            
     authorized_ids = [user_node_id]
     queue = [user_node_id]
     while queue:
-        for child in tree_map.get(queue.pop(0), []):
-            if child not in authorized_ids:
-                authorized_ids.append(child)
-                queue.append(child)
+        current = queue.pop(0)
+        if current in tree_map:
+            for child in tree_map[current]:
+                if child not in authorized_ids:
+                    authorized_ids.append(child)
+                    queue.append(child)
     return authorized_ids
+
 
 auth_nodes = get_authorized_node_ids(current_node_id, current_role)
 placeholders = ",".join("?" for _ in auth_nodes)
