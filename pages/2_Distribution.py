@@ -94,7 +94,7 @@ if mode == "Summary Table":
 else:
     dot = Digraph()
     dot.attr(rankdir='TB')
-    nodes = cursor.execute(f"SELECT node_id, node_name, parent_id FROM Org_Structure WHERE node_id IN ({placeholders})").fetchall()
+        nodes = cursor.execute(f"SELECT node_id, node_name, parent_id FROM Org_Structure WHERE node_id IN ({placeholders})", auth_nodes).fetchall()
     for n_id, name, p_id in nodes:
         dot.node(str(n_id), name)
         if p_id and p_id in auth_nodes: dot.edge(str(p_id), str(n_id))
