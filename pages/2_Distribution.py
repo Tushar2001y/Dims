@@ -32,7 +32,6 @@ def get_authorized_node_ids(user_node_id, role):
     user_node_id = int(user_node_id)
     all_nodes = cursor.execute("SELECT node_id, parent_id FROM Org_Structure").fetchall()
     
-    # Safe, explicit dictionary mapping to completely avoid comprehension NameErrors
     tree_map = {}
     for n_id, p_id in all_nodes:
         if p_id is not None:
@@ -49,7 +48,6 @@ def get_authorized_node_ids(user_node_id, role):
                     queue.append(child)
     return authorized_ids
 
-
 auth_nodes = get_authorized_node_ids(current_node_id, current_role)
 placeholders = ",".join("?" for _ in auth_nodes)
 
@@ -63,10 +61,12 @@ if current_role == 'Admin':
         c1, c2, _ = st.columns([2, 2, 6])
         if c1.button("Forward to Col GSEM", key=f"fwd_{idx}"):
             cursor.execute("UPDATE Receipt_Requests SET status='Pending_GSEM' WHERE receipt_id=?", (row['receipt_id'],))
-            conn.commit(); st.rerun()
+            conn.commit()
+            st.rerun()
         if c2.button("Reject", key=f"rej_{idx}"):
             cursor.execute("UPDATE Receipt_Requests SET status='Rejected' WHERE receipt_id=?", (row['receipt_id'],))
-            conn.commit(); st.rerun()
+            conn.commit()
+            st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
 # --- WORKFLOW 1.5: TIER 2 COMMANDER FINAL SANCTION ---
@@ -80,7 +80,8 @@ elif current_role == 'Commander':
             cursor.execute("INSERT INTO Distributed_Assets (model_name, serial_number, assigned_unit_id, status, issue_date, auth_letter) VALUES (?, ?, (SELECT node_id FROM Org_Structure WHERE node_name=?), 'Operational', ?, ?)", 
                            (row['model_name'], row['serial_number'], row['node_name'], row['arrival_date'], row['letter_number']))
             cursor.execute("UPDATE Receipt_Requests SET status='Approved' WHERE receipt_id=?", (row['receipt_id'],))
-            conn.commit(); st.rerun()
+            conn.commit()
+            st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
 # --- WORKFLOW 2: AGGREGATED DOSSIER & FLOWCHART ---
@@ -94,18 +95,22 @@ if mode == "Summary Table":
 else:
     dot = Digraph()
     dot.attr(rankdir='TB')
-        nodes = cursor.execute(f"SELECT node_id, node_name, parent_id FROM Org_Structure WHERE node_id IN ({placeholders})", auth_nodes).fetchall()
+    nodes = cursor.execute(f"SELECT node_id, node_name, parent_id FROM Org_Structure WHERE node_id IN ({placeholders})", auth_nodes).fetchall()
     for n_id, name, p_id in nodes:
         dot.node(str(n_id), name)
-        if p_id and p_id in auth_nodes: dot.edge(str(p_id), str(n_id))
+        if p_id and p_id in auth_nodes: 
+            dot.edge(str(p_id), str(n_id))
     st.graphviz_chart(dot)
 
 # --- WORKFLOW 3: FIELD RECONNAISSANCE ---
 if current_role not in ['Admin', 'Commander']:
     with st.form("inbound_form"):
-        r_model = st.text_input("Model"); r_sn = st.text_input("Serial Number"); r_letter = st.text_input("Authority Letter")
+        r_model = st.text_input("Model")
+        r_sn = st.text_input("Serial Number")
+        r_letter = st.text_input("Authority Letter")
         if st.form_submit_button("Submit"):
             cursor.execute("INSERT INTO Receipt_Requests (model_name, serial_number, unit_id, status) VALUES (?,?,?, 'Pending Verification')", (r_model, r_sn, current_node_id))
-            conn.commit(); st.toast("Forwarded")
+            conn.commit()
+            st.toast("Forwarded")
 
 conn.close()
