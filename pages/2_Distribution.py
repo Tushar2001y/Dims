@@ -114,10 +114,10 @@ else:
         
     # 3. Build the HTML-table nodes
     for n_id, name, p_id in nodes:
-        # Start HTML table definition
+        # Changed BGCOLOR to a light slate gray and FONT COLOR to pure black
         html_label = f'''<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
-            <TR><TD COLSPAN="3" BGCOLOR="#0f172a"><FONT COLOR="#f8fafc"><B>{name}</B></FONT></TD></TR>'''
-        
+            <TR><TD COLSPAN="3" BGCOLOR="#e2e8f0"><FONT COLOR="#000000"><B>{name}</B></FONT></TD></TR>'''
+
         # Populate table rows if unit has drones
         if n_id in unit_assets:
             html_label += '<TR><TD BGCOLOR="#f1f5f9"><B>Model</B></TD><TD BGCOLOR="#f1f5f9"><B>S/N</B></TD><TD BGCOLOR="#f1f5f9"><B>Status</B></TD></TR>'
@@ -125,9 +125,8 @@ else:
                 # Color code the status text
                 status_color = "#10b981" if status == 'Operational' else "#ef4444"
                 html_label += f'<TR><TD>{model}</TD><TD>{sn}</TD><TD><FONT COLOR="{status_color}">{status}</FONT></TD></TR>'
-        else:
-            html_label += '<TR><TD COLSPAN="3" BGCOLOR="#ffffff"><FONT COLOR="#94a3b8"><I>No deployed assets</I></FONT></TD></TR>'
-            
+                else:
+            html_label += '<TR><TD COLSPAN="3" BGCOLOR="#ffffff"><FONT COLOR="#475569"><I>No deployed assets</I></FONT></TD></TR>'          
         html_label += '</TABLE>>'
         
         # Add the node and its connections
