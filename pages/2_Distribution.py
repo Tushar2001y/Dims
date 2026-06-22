@@ -95,43 +95,50 @@ if mode == "Summary Table":
 else:
     dot = Digraph()
     dot.attr(rankdir='TB')
-    # Set node shape to plaintext to allow custom HTML tables
     dot.attr('node', shape='plaintext', fontname='Inter')
     
-    # 1. Fetch organizational nodes
     nodes = cursor.execute(f"SELECT node_id, node_name, parent_id FROM Org_Structure WHERE node_id IN ({placeholders})", auth_nodes).fetchall()
     
-    # 2. Fetch all distributed assets for these nodes
     assets_query = f"SELECT assigned_unit_id, model_name, serial_number, status FROM Distributed_Assets WHERE assigned_unit_id IN ({placeholders})"
     assets_data = cursor.execute(assets_query, auth_nodes).fetchall()
     
-    # Organize assets into a dictionary grouped by unit_id
     unit_assets = {}
     for uid, model, sn, status in assets_data:
         if uid not in unit_assets:
             unit_assets[uid] = []
         unit_assets[uid].append((model, sn, status))
         
-    # 3. Build the HTML-table nodes
     for n_id, name, p_id in nodes:
-        # Changed BGCOLOR to a light slate gray and FONT COLOR to pure black
+        # Implemented black text on light gray background for unit headers
         html_label = f'''<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5">
             <TR><TD COLSPAN="3" BGCOLOR="#e2e8f0"><FONT COLOR="#000000"><B>{name}</B></FONT></TD></TR>'''
-
-        # Populate table rows if unit has drones
+        
         if n_id in unit_assets:
             html_label += '<TR><TD BGCOLOR="#f1f5f9"><B>Model</B></TD><TD BGCOLOR="#f1f5f9"><B>S/N</B></TD><TD BGCOLOR="#f1f5f9"><B>Status</B></TD></TR>'
             for model, sn, status in unit_assets[n_id]:
-                # Color code the status text
                 status_color = "#10b981" if status == 'Operational' else "#ef4444"
                 html_label += f'<TR><TD>{model}</TD><TD>{sn}</TD><TD><FONT COLOR="{status_color}">{status}</FONT></TD></TR>'
-                else:
-            html_label += '<TR><TD COLSPAN="3" BGCOLOR="#ffffff"><FONT COLOR="#475569"><I>No deployed assets</I></FONT></TD></TR>'          
+        else:
+            # Adjusted "No deployed assets" to a darker gray for readability
+            html_label += '<TR><TD COLSPAN="3" BGCOLOR="#ffffff"><FONT COLOR="#475569"><I>No deployed assets</I></FONT></TD></TR>'
+            
         html_label += '</TABLE>>'
         
-        # Add the node and its connections
         dot.node(str(n_id), label=html_label)
         if p_id and p_id in auth_nodes: 
             dot.edge(str(p_id), str(n_id))
             
     st.graphviz_chart(dot)
+
+# --- WORKFLOW 3: FIELD RECONNAISSANCE ---
+if current_role not in ['Admin', 'Commander']:
+    with st.form("inbound_form"):
+        r_model = st.text_input("Model")
+        r_sn = st.text_input("Serial Number")
+        r_letter = st.text_input("Authority Letter")
+        if st.form_submit_button("Submit"):
+            cursor.execute("INSERT INTO Receipt_Requests (model_name, serial_number, unit_id, status) VALUES (?,?,?, 'Pending Verification')", (r_model, r_sn, current_node_id))
+            conn.commit()
+            st.toast("Forwarded")
+
+conn.close()
